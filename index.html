@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>정성담은 김장 & 양념 예약 신청</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS (xlsx.full.min.js) CDN for Excel Import/Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Google Fonts Inter & Noto Sans KR -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#fff1f2',
+                            100: '#ffe4e6',
+                            500: '#e11d48',
+                            600: '#be123c',
+                            700: '#9f1239',
+                            800: '#881337',
+                            900: '#4c0519',
+                        },
+                        sage: {
+                            50: '#f4f7f4',
+                            100: '#e3eae3',
+                            600: '#4a6b53',
+                            700: '#3a5441',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Noto Sans KR', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #fcfbf9; }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* PRINT STYLING (A4 Clean Print Form) */
+        @media print {
+            body {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+            }
+            /* Hide unnecessary web elements when printing */
+            header, .no-print, #toast, #user-view, #admin-view, #lookup-view {
+                display: none !important;
+            }
+            /* Force show print view */
+            #print-view {
+                display: block !important;
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 20px;
+            }
+            .print-border {
+                border: 2px solid #000 !important;
+            }
+            .print-bg {
+                background-color: #f8f8f8 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body class="text-gray-800 min-h-screen flex flex-col">
+
+    <header class="bg-white border-b border-rose-100 sticky top-0 z-40 shadow-sm no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-20 items-center">
+                <div class="flex items-center space-x-3 cursor-pointer" onclick="switchView('user')">
+                    <div class="w-11 h-11 bg-brand-600 rounded-xl flex items-center justify-center text-white text-2xl shadow-md shadow-brand-100">
+                        <i class="fa-solid fa-pepper-hot"></i>
+                    </div>
+                    <div>
+                        <span class="text-xl font-bold text-gray-900 tracking-tight block">정성담은 김장/양념</span>
+                        <span class="text-xs text-brand-600 font-medium">2026 사전 예약 시스템</span>
+                    </div>
+                </div>
+
+                <!-- Navigation Tabs -->
+                <div class="flex space-x-1 sm:space-x-2 bg-gray-100 p-1.5 rounded-xl">
+                    <button id="nav-user-btn" onclick="switchView('user')" class="px-3.5 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 bg-white shadow-sm text-brand-700">
+                        <i class="fa-solid fa-cart-shopping mr-1.5"></i>예약 신청
+                    </button>
+                    <button id="nav-lookup-btn" onclick="switchView('lookup')" class="px-3.5 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 text-gray-600 hover:text-gray-900">
+                        <i class="fa-solid fa-magnifying-glass mr-1.5"></i>내 예약 조회
+                    </button>
+                    <button id="nav-admin-btn" onclick="switchView('admin')" class="px-3.5 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 text-gray-600 hover:text-gray-900">
+                        <i class="fa-solid fa-sliders mr-1.5"></i>관리자
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-gray-900 text-white px-5 py-3.5 rounded-xl shadow-2xl flex items-center space-x-3 no-print">
+        <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+        <span id="toast-message" class="text-sm font-medium">메시지가 표시됩니다.</span>
+    </div>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <section id="user-view" class="space-y-8">
+            <!-- Hero Banner -->
+            <div class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-brand-800 via-brand-700 to-sage-700 text-white p-8 sm:p-12 shadow-xl">
+                <div class="relative z-10 max-w-2xl">
+                    <span class="inline-block bg-white/20 backdrop-blur-md text-xs font-semibold px-3 py-1 rounded-full mb-3 tracking-wide">신선한 우리 농산물 100%</span>
+                    <h1 class="text-3xl sm:text-4xl font-extrabold leading-tight mb-3">2026년 가을·겨울맞이<br>김장 및 양념 사전 예약</h1>
+                    <p class="text-rose-100 text-sm sm:text-base mb-6 leading-relaxed">엄선된 국산 재료로 만드는 프리미엄 김치와 양념을 원하는 날짜에 맞춰 신선하게 배송 및 현장 수령해 드립니다.</p>
+                    <div class="flex flex-wrap gap-4 text-xs font-medium text-rose-100">
+                        <div class="flex items-center"><i class="fa-solid fa-truck-fast mr-1.5 text-yellow-300"></i> 지정일 예약 배송</div>
+                        <div class="flex items-center"><i class="fa-solid fa-leaf mr-1.5 text-emerald-300"></i> 100% 국내산 산지 직송</div>
+                        <div class="flex items-center"><i class="fa-solid fa-shield-halved mr-1.5 text-blue-300"></i> 안전위생 HACCP 인증</div>
+                    </div>
+                </div>
+                <div class="absolute -right-10 -bottom-10 opacity-15 pointer-events-none text-white">
+                    <i class="fa-solid fa-bowl-rice text-[260px]"></i>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <!-- Left Column: Selection Form -->
+                <div class="lg:col-span-7 space-y-6">
+                    <div class="bg-white rounded-2xl p-6 sm:p-8 border border-gray-100 shadow-sm">
+                        <h2 class="text-lg font-bold text-gray-900 border-b border-gray-100 pb-4 mb-6 flex items-center">
+                            <span class="w-7 h-7 bg-brand-100 text-brand-700 rounded-lg flex items-center justify-center text-xs font-bold mr-2.5">1</span>
+                            상품 및 옵션 선택
+                        </h2>
+
+                        <!-- Step 1: Category Select (Table 1) -->
+                        <div class="mb-6">
+                            <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">카테고리 선택</label>
+                            <div id="category-button-group" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                <!-- Dynamic Category Buttons -->
+                            </div>
+                        </div>
+
+                        <!-- Step 2: Product Select (Table 2) -->
+                        <div class="mb-6">
+                            <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">상품 선택</label>
+                            <select id="user-product-select" onchange="handleProductChange()" class="w-full bg-gray-50 border border-gray-200 text-gray-800 rounded-xl p-3.5 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all font-medium">
+                                <option value="">-- 먼저 카테고리를 선택하세요 --</option>
+                            </select>
+                        </div>
+
+                        <!-- Step 3: Price / Weight Option Select (Table 3) -->
+                        <div class="mb-6">
+                            <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">규격 / 용량 및 가격 선택</label>
+                            <div id="price-options-container" class="space-y-2.5">
+                                <p class="text-sm text-gray-400 italic bg-gray-50 p-4 rounded-xl text-center">상품을 선택하시면 용량 및 가격 옵션이 표시됩니다.</p>
+                            </div>
+                        </div>
+
+                        <!-- Step 4: Quantity Select -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">수량 선택</label>
+                            <div class="flex items-center space-x-3 w-40">
+                                <button type="button" onclick="adjustQuantity(-1)" class="w-10 h-10 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-100 flex items-center justify-center font-bold text-lg">-</button>
+                                <input type="number" id="user-quantity" value="1" min="1" max="99" onchange="calculateTotal()" class="w-16 text-center font-bold text-gray-800 border-none bg-gray-50 focus:outline-none rounded-lg p-2">
+                                <button type="button" onclick="adjustQuantity(1)" class="w-10 h-10 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-100 flex items-center justify-center font-bold text-lg">+</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Customer Info Form -->
+                    <div class="bg-white rounded-2xl p-6 sm:p-8 border border-gray-100 shadow-sm">
+                        <h2 class="text-lg font-bold text-gray-900 border-b border-gray-100 pb-4 mb-6 flex items-center">
+                            <span class="w-7 h-7 bg-brand-100 text-brand-700 rounded-lg flex items-center justify-center text-xs font-bold mr-2.5">2</span>
+                            예약자 정보 입력
+                        </h2>
+
+                        <form id="reservation-form" onsubmit="submitReservation(event)" class="space-y-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">성함 <span class="text-rose-500">*</span></label>
+                                    <input type="text" id="cust-name" required placeholder="홍길동" class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">연락처 <span class="text-rose-500">*</span></label>
+                                    <input type="tel" id="cust-phone" required placeholder="010-1234-5678" class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">수령 방식 <span class="text-rose-500">*</span></label>
+                                    <select id="cust-type" class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                        <option value="택배배송">택배 배송</option>
+                                        <option value="방문수령">매장 방문 수령</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">희망 수령일 <span class="text-rose-500">*</span></label>
+                                    <input type="date" id="cust-date" required class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 mb-1">배송지 주소 (방문수령시 생략 가능)</label>
+                                <input type="text" id="cust-address" placeholder="주소를 입력하세요" class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 mb-1">요청/메모 사항</label>
+                                <textarea id="cust-memo" rows="2" placeholder="예: 덜 매운 양념으로 부탁드려요 / 문 앞에 놓아주세요" class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none resize-none"></textarea>
+                            </div>
+
+                            <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-brand-200 transition-all duration-200 mt-4 text-base flex items-center justify-center space-x-2">
+                                <i class="fa-solid fa-check-circle"></i>
+                                <span>예약 신청 확정하기</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Right Column: Summary Box -->
+                <div class="lg:col-span-5">
+                    <div class="bg-white rounded-2xl p-6 sm:p-8 border border-gray-100 shadow-sm sticky top-28">
+                        <h3 class="text-base font-bold text-gray-900 border-b border-gray-100 pb-4 mb-4 flex justify-between items-center">
+                            <span>내 예약 견적 요약</span>
+                            <span class="text-xs font-normal text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">자동 계산</span>
+                        </h3>
+
+                        <div class="space-y-4 text-sm">
+                            <div class="flex justify-between py-1 text-gray-600">
+                                <span>선택 카테고리</span>
+                                <span id="summary-category" class="font-medium text-gray-800">-</span>
+                            </div>
+                            <div class="flex justify-between py-1 text-gray-600">
+                                <span>선택 상품명</span>
+                                <span id="summary-product" class="font-medium text-gray-800">-</span>
+                            </div>
+                            <div class="flex justify-between py-1 text-gray-600">
+                                <span>규격 / 옵션</span>
+                                <span id="summary-option" class="font-medium text-gray-800">-</span>
+                            </div>
+                            <div class="flex justify-between py-1 text-gray-600">
+                                <span>단가</span>
+                                <span id="summary-unit-price" class="font-medium text-gray-800">0 원</span>
+                            </div>
+                            <div class="flex justify-between py-1 text-gray-600">
+                                <span>수량</span>
+                                <span id="summary-quantity" class="font-medium text-gray-800">1 개</span>
+                            </div>
+
+                            <div class="border-t border-dashed border-gray-200 my-4 pt-4">
+                                <div class="flex justify-between items-baseline">
+                                    <span class="font-bold text-gray-900 text-base">총 결제 예정 금액</span>
+                                    <span id="summary-total-price" class="text-2xl font-extrabold text-brand-600">0 원</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 bg-rose-50 border border-rose-100 rounded-xl p-4 text-xs text-brand-800 space-y-1.5">
+                            <p class="font-bold flex items-center"><i class="fa-solid fa-circle-info mr-1.5 text-brand-600"></i> 안내사항</p>
+                            <p>• 예약 신청 후 확정서 출력 및 조회가 가능합니다.</p>
+                            <p>• 입금/결제 관련 정보는 담당자 확인 후 별도 안내드립니다.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="print-view" class="hidden max-w-3xl mx-auto space-y-6">
+            <div class="no-print flex justify-between items-center bg-emerald-50 border border-emerald-200 p-4 rounded-2xl text-emerald-800">
+                <div class="flex items-center space-x-3">
+                    <i class="fa-solid fa-circle-check text-2xl text-emerald-600"></i>
+                    <div>
+                        <h3 class="font-bold text-sm">예약 신청이 성공적으로 접수되었습니다!</h3>
+                        <p class="text-xs text-emerald-700">아래 예약 신청서를 확인하시거나 인쇄(PDF)하실 수 있습니다.</p>
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="window.print()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-sm transition-all">
+                        <i class="fa-solid fa-print"></i>
+                        <span>인쇄하기 (PDF / 프린터)</span>
+                    </button>
+                    <button onclick="switchView('user')" class="bg-white border border-gray-300 text-gray-700 font-bold px-4 py-2 rounded-xl text-xs hover:bg-gray-50 transition-all">
+                        새 예약하기
+                    </button>
+                </div>
+            </div>
+
+            <!-- PRINTABLE RECEIPT FORM -->
+            <div class="bg-white border-2 border-gray-800 p-8 sm:p-12 rounded-3xl shadow-lg space-y-8 print-border">
+                <div class="flex justify-between items-start border-b-2 border-gray-800 pb-6">
+                    <div>
+                        <span class="text-xs font-bold uppercase tracking-widest text-brand-700 block mb-1">[ 2026 김장·양념 사전예약 ]</span>
+                        <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900">예약 신청 확정서</h1>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs text-gray-500">신청 일시</p>
+                        <p id="receipt-date" class="text-sm font-semibold text-gray-800">-</p>
+                        <p class="text-xs font-mono font-bold text-gray-600 mt-1" id="receipt-id">RES-000000</p>
+                    </div>
+                </div>
+
+                <!-- Section: Customer Info -->
+                <div class="space-y-3">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">1. 예약자 및 수령 정보</h3>
+                    <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 grid grid-cols-2 gap-y-3 text-xs sm:text-sm print-bg">
+                        <div>
+                            <span class="text-gray-500 block text-xs">예약자 성함</span>
+                            <span id="receipt-name" class="font-bold text-gray-900">-</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500 block text-xs">연락처</span>
+                            <span id="receipt-phone" class="font-bold text-gray-900">-</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500 block text-xs">수령 방식</span>
+                            <span id="receipt-type" class="font-bold text-gray-900">-</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500 block text-xs">희망 수령일</span>
+                            <span id="receipt-target-date" class="font-bold text-brand-700">-</span>
+                        </div>
+                        <div class="col-span-2">
+                            <span class="text-gray-500 block text-xs">배송지 주소</span>
+                            <span id="receipt-address" class="font-medium text-gray-800">-</span>
+                        </div>
+                        <div class="col-span-2">
+                            <span class="text-gray-500 block text-xs">요청 / 메모</span>
+                            <span id="receipt-memo" class="font-medium text-gray-800">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Ordered Items -->
+                <div class="space-y-3">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">2. 신청 상품 및 결제 상세</h3>
+                    <table class="w-full text-xs sm:text-sm border-collapse border border-gray-300">
+                        <thead>
+                            <tr class="bg-gray-100 border-b border-gray-300 text-gray-700 font-bold text-left print-bg">
+                                <th class="p-3 border-r border-gray-300">카테고리</th>
+                                <th class="p-3 border-r border-gray-300">상품명</th>
+                                <th class="p-3 border-r border-gray-300">규격/용량</th>
+                                <th class="p-3 border-r border-gray-300 text-right">단가</th>
+                                <th class="p-3 border-r border-gray-300 text-center">수량</th>
+                                <th class="p-3 text-right">금액</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-gray-300">
+                                <td id="receipt-item-cat" class="p-3 border-r border-gray-300">-</td>
+                                <td id="receipt-item-prod" class="p-3 border-r border-gray-300 font-bold">-</td>
+                                <td id="receipt-item-opt" class="p-3 border-r border-gray-300">-</td>
+                                <td id="receipt-item-unit" class="p-3 border-r border-gray-300 text-right">-</td>
+                                <td id="receipt-item-qty" class="p-3 border-r border-gray-300 text-center font-bold">-</td>
+                                <td id="receipt-item-subtotal" class="p-3 text-right font-bold text-gray-900">-</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Total Amount Summary Box -->
+                <div class="bg-rose-50 border border-rose-200 p-5 rounded-2xl flex justify-between items-center print-bg">
+                    <div>
+                        <p class="text-xs text-brand-800 font-bold uppercase">최종 결제 예정 금액</p>
+                        <p class="text-xs text-gray-500">VAT 포함 및 택배 기본 배송비 무료 적용</p>
+                    </div>
+                    <span id="receipt-grand-total" class="text-2xl sm:text-3xl font-black text-brand-700">0 원</span>
+                </div>
+
+                <!-- Footer Sign / Notice -->
+                <div class="border-t border-gray-200 pt-6 text-xs text-gray-500 space-y-2">
+                    <div class="flex justify-between items-end">
+                        <div>
+                            <p class="font-bold text-gray-700 mb-1">상호: 정성담은 김장/양념 사업단</p>
+                            <p>문의전화: 02-1234-5678 | 고객센터 운영시간: 09:00 ~ 18:00</p>
+                        </div>
+                        <div class="text-right border-b border-gray-400 pb-1 w-32 font-semibold text-gray-800">
+                            (서명/인)
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="lookup-view" class="hidden space-y-6 max-w-2xl mx-auto">
+            <div class="bg-white rounded-2xl p-6 sm:p-8 border border-gray-100 shadow-sm text-center space-y-4">
+                <div class="w-12 h-12 bg-rose-100 text-brand-600 rounded-2xl flex items-center justify-center mx-auto text-xl">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-gray-900">내 예약 내역 조회</h2>
+                    <p class="text-xs text-gray-500 mt-1">예약 시 입력하신 성함과 연락처로 내역을 조회합니다.</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left pt-2">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">예약자 성함</label>
+                        <input type="text" id="lookup-name" placeholder="홍길동" class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">연락처</label>
+                        <input type="tel" id="lookup-phone" placeholder="010-1234-5678" class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <button onclick="performReservationLookup()" class="w-full bg-gray-900 hover:bg-black text-white font-bold py-3.5 rounded-xl transition-all text-sm">
+                    예약 내역 검색하기
+                </button>
+            </div>
+
+            <!-- Lookup Results Container -->
+            <div id="lookup-results-container" class="space-y-4">
+                <!-- Dynamically populated results -->
+            </div>
+        </section>
+
+        <section id="admin-view" class="hidden space-y-8">
+            <!-- Admin Top Controls Bar -->
+            <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-900">관리자 데이터 컨트롤 센터</h2>
+                    <p class="text-xs text-gray-500 mt-1">상품 카테고리, 제품명, 가격 옵션 및 예약 데이터의 XLSX 엑셀 파일 가져오기/내보내기 지원</p>
+                </div>
+                
+                <!-- XLSX Import / Export Buttons -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <button onclick="exportProductsToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center space-x-1.5">
+                        <i class="fa-solid fa-file-excel"></i>
+                        <span>상품/가격 엑셀 내보내기</span>
+                    </button>
+                    
+                    <label class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer transition-all shadow-sm flex items-center space-x-1.5">
+                        <i class="fa-solid fa-file-import"></i>
+                        <span>상품/가격 엑셀 불러오기</span>
+                        <input type="file" id="excel-file-input" accept=".xlsx, .xls" onchange="importProductsFromExcel(event)" class="hidden">
+                    </label>
+
+                    <button onclick="exportOrdersToExcel()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center space-x-1.5">
+                        <i class="fa-solid fa-download"></i>
+                        <span>예약 내역 엑셀 다운로드</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Admin Nav Sub-Tabs -->
+            <div class="flex border-b border-gray-200">
+                <button id="admin-tab-products" onclick="switchAdminSubTab('products')" class="px-6 py-3 font-semibold text-sm text-brand-600 border-b-2 border-brand-600">
+                    <i class="fa-solid fa-boxes-stacked mr-2"></i>상품 및 가격 설정 (테이블 1,2,3)
+                </button>
+                <button id="admin-tab-orders" onclick="switchAdminSubTab('orders')" class="px-6 py-3 font-semibold text-sm text-gray-500 hover:text-gray-700">
+                    <i class="fa-solid fa-list-check mr-2"></i>고객 예약 내역 관리 (<span id="reservation-count-badge">0</span>)
+                </button>
+            </div>
+
+            <!-- TAB 1: 3 TABLES MANAGEMENT (Category, Product, Price) -->
+            <div id="subtab-products-content" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- TABLE 1: Category Management -->
+                <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex flex-col">
+                    <div class="flex justify-between items-center pb-3 border-b border-gray-100 mb-4">
+                        <h3 class="font-bold text-gray-900 flex items-center text-sm">
+                            <span class="w-6 h-6 bg-red-100 text-red-700 rounded-md flex items-center justify-center text-xs font-bold mr-2">1</span>
+                            테이블 1: 카테고리 관리
+                        </h3>
+                    </div>
+
+                    <!-- Category Add Form -->
+                    <div class="flex space-x-2 mb-4">
+                        <input type="text" id="t1-category-input" placeholder="새 카테고리 (예: 절임배추)" class="flex-grow border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        <button onclick="addCategory()" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition-all whitespace-nowrap">
+                            <i class="fa-solid fa-plus mr-1"></i>추가
+                        </button>
+                    </div>
+
+                    <!-- Category List Table -->
+                    <div class="overflow-y-auto max-h-80 border border-gray-100 rounded-xl flex-grow">
+                        <table class="w-full text-xs text-left">
+                            <thead class="bg-gray-50 text-gray-600 sticky top-0">
+                                <tr>
+                                    <th class="p-2.5">ID</th>
+                                    <th class="p-2.5">카테고리명</th>
+                                    <th class="p-2.5 text-right">관리</th>
+                                </tr>
+                            </thead>
+                            <tbody id="t1-category-tbody" class="divide-y divide-gray-100">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- TABLE 2: Product Name Management -->
+                <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex flex-col">
+                    <div class="flex justify-between items-center pb-3 border-b border-gray-100 mb-4">
+                        <h3 class="font-bold text-gray-900 flex items-center text-sm">
+                            <span class="w-6 h-6 bg-amber-100 text-amber-700 rounded-md flex items-center justify-center text-xs font-bold mr-2">2</span>
+                            테이블 2: 상품명 추가/관리
+                        </h3>
+                    </div>
+
+                    <!-- Product Add Form -->
+                    <div class="space-y-2 mb-4">
+                        <select id="t2-category-select" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            <option value="">-- 카테고리 선택 --</option>
+                        </select>
+                        <div class="flex space-x-2">
+                            <input type="text" id="t2-product-input" placeholder="상품명 (예: 포기김치)" class="flex-grow border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            <button onclick="addProduct()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition-all whitespace-nowrap">
+                                <i class="fa-solid fa-plus mr-1"></i>추가
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Product List Table -->
+                    <div class="overflow-y-auto max-h-80 border border-gray-100 rounded-xl flex-grow">
+                        <table class="w-full text-xs text-left">
+                            <thead class="bg-gray-50 text-gray-600 sticky top-0">
+                                <tr>
+                                    <th class="p-2.5">카테고리</th>
+                                    <th class="p-2.5">상품명</th>
+                                    <th class="p-2.5 text-right">관리</th>
+                                </tr>
+                            </thead>
+                            <tbody id="t2-product-tbody" class="divide-y divide-gray-100">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- TABLE 3: Price & Option Management -->
+                <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex flex-col">
+                    <div class="flex justify-between items-center pb-3 border-b border-gray-100 mb-4">
+                        <h3 class="font-bold text-gray-900 flex items-center text-sm">
+                            <span class="w-6 h-6 bg-emerald-100 text-emerald-700 rounded-md flex items-center justify-center text-xs font-bold mr-2">3</span>
+                            테이블 3: 가격 및 규격 설정
+                        </h3>
+                    </div>
+
+                    <!-- Price Option Add Form -->
+                    <div class="space-y-2 mb-4">
+                        <select id="t3-product-select" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            <option value="">-- 상품 선택 --</option>
+                        </select>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="text" id="t3-option-input" placeholder="용량/규격 (예: 10kg)" class="border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            <input type="number" id="t3-price-input" placeholder="가격(원)" class="border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        </div>
+                        <button onclick="addPriceOption()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2 rounded-xl transition-all">
+                            <i class="fa-solid fa-plus mr-1"></i>가격 옵션 등록
+                        </button>
+                    </div>
+
+                    <!-- Price List Table -->
+                    <div class="overflow-y-auto max-h-80 border border-gray-100 rounded-xl flex-grow">
+                        <table class="w-full text-xs text-left">
+                            <thead class="bg-gray-50 text-gray-600 sticky top-0">
+                                <tr>
+                                    <th class="p-2.5">상품명</th>
+                                    <th class="p-2.5">규격</th>
+                                    <th class="p-2.5">가격</th>
+                                    <th class="p-2.5 text-right">관리</th>
+                                </tr>
+                            </thead>
+                            <tbody id="t3-price-tbody" class="divide-y divide-gray-100">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: RESERVATION ORDERS LIST MANAGEMENT -->
+            <div id="subtab-orders-content" class="hidden bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+                <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 pb-4 border-b border-gray-100">
+                    <h3 class="text-base font-bold text-gray-900">고객 예약 데이터 현황</h3>
+                    <div class="flex items-center space-x-2">
+                        <input type="text" id="order-search-input" onkeyup="filterOrders()" placeholder="예약자명 또는 연락처 검색..." class="border border-gray-200 rounded-xl px-3 py-2 text-xs w-64 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        <button onclick="clearAllOrders()" class="text-xs text-rose-600 hover:bg-rose-50 px-3 py-2 rounded-xl transition-all border border-rose-200">
+                            <i class="fa-solid fa-trash-can mr-1"></i>전체 삭제
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Reservation Table -->
+                <div class="overflow-x-auto rounded-xl border border-gray-100">
+                    <table class="w-full text-xs text-left text-gray-700">
+                        <thead class="bg-gray-50 text-gray-600 font-semibold uppercase border-b border-gray-100">
+                            <tr>
+                                <th class="p-3">예약 번호</th>
+                                <th class="p-3">예약 일자</th>
+                                <th class="p-3">성함</th>
+                                <th class="p-3">연락처</th>
+                                <th class="p-3">수령 방식 / 희망일</th>
+                                <th class="p-3">주문 상품 정보</th>
+                                <th class="p-3">총 금액</th>
+                                <th class="p-3 text-center">관리 / 인쇄</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reservation-tbody" class="divide-y divide-gray-100">
+                            <!-- Dynamic Reservation Rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Initial Default Sample Data Structure
+        const DEFAULT_DATA = {
+            categories: [
+                { id: "CAT1", name: "김장김치" },
+                { id: "CAT2", name: "양념류" },
+                { id: "CAT3", name: "절임배추" }
+            ],
+            products: [
+                { id: "PROD1", categoryId: "CAT1", name: "포기김치 (국산)" },
+                { id: "PROD2", categoryId: "CAT1", name: "총각김치 (알타리)" },
+                { id: "PROD3", categoryId: "CAT2", name: "명품 김장양념" },
+                { id: "PROD4", categoryId: "CAT3", name: "해남 절임배추" }
+            ],
+            prices: [
+                { id: "PRI1", productId: "PROD1", option: "10kg", price: 65000 },
+                { id: "PRI2", productId: "PROD1", option: "20kg", price: 120000 },
+                { id: "PRI3", productId: "PROD2", option: "5kg", price: 42000 },
+                { id: "PRI4", productId: "PROD3", option: "5kg (배추 10kg용)", price: 48000 },
+                { id: "PRI5", productId: "PROD3", option: "10kg (배추 20kg용)", price: 90000 },
+                { id: "PRI6", productId: "PROD4", option: "20kg (7~9포기)", price: 45000 }
+            ],
+            reservations: [
+                {
+                    id: "RES-20261001-01",
+                    date: "2026-10-01 10:30",
+                    name: "홍길동",
+                    phone: "010-1234-5678",
+                    type: "택배배송",
+                    targetDate: "2026-11-15",
+                    address: "서울특별시 강남구 테헤란로 123",
+                    category: "김장김치",
+                    product: "포기김치 (국산)",
+                    option: "10kg",
+                    unitPrice: 65000,
+                    quantity: 2,
+                    totalPrice: 130000,
+                    memo: "문 앞에 두고 벨 눌러주세요"
+                }
+            ]
+        };
+
+        // Global Application State
+        let db = {
+            categories: [],
+            products: [],
+            prices: [],
+            reservations: []
+        };
+
+        let selectedCategoryName = "";
+        let selectedProductPriceOption = null;
+
+        window.onload = function() {
+            loadStateFromLocalStorage();
+            renderUserCategories();
+            renderAdminTables();
+            renderReservationsTable();
+            
+            // Set minimum pickup date to today
+            const today = new Date().toISOString().split('T')[0];
+            const dateInput = document.getElementById('cust-date');
+            if (dateInput) dateInput.setAttribute('min', today);
+        };
+
+        // Local Storage Sync
+        function loadStateFromLocalStorage() {
+            const saved = localStorage.getItem('kimchi_reservation_db');
+            if (saved) {
+                try {
+                    db = JSON.parse(saved);
+                } catch(e) {
+                    db = JSON.parse(JSON.stringify(DEFAULT_DATA));
+                }
+            } else {
+                db = JSON.parse(JSON.stringify(DEFAULT_DATA));
+                saveStateToLocalStorage();
+            }
+        }
+
+        function saveStateToLocalStorage() {
+            localStorage.setItem('kimchi_reservation_db', JSON.stringify(db));
+        }
+
+        // Navigation View Switching
+        function switchView(view) {
+            const views = {
+                user: document.getElementById('user-view'),
+                print: document.getElementById('print-view'),
+                lookup: document.getElementById('lookup-view'),
+                admin: document.getElementById('admin-view')
+            };
+
+            const btns = {
+                user: document.getElementById('nav-user-btn'),
+                lookup: document.getElementById('nav-lookup-btn'),
+                admin: document.getElementById('nav-admin-btn')
+            };
+
+            // Hide all views
+            Object.values(views).forEach(v => v && v.classList.add('hidden'));
+
+            // Reset navigation button styles
+            Object.values(btns).forEach(b => {
+                if (b) b.className = "px-3.5 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 text-gray-600 hover:text-gray-900";
+            });
+
+            if (view === 'user') {
+                views.user.classList.remove('hidden');
+                btns.user.className = "px-3.5 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 bg-white shadow-sm text-brand-700";
+                renderUserCategories();
+            } else if (view === 'print') {
+                views.print.classList.remove('hidden');
+            } else if (view === 'lookup') {
+                views.lookup.classList.remove('hidden');
+                btns.lookup.className = "px-3.5 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 bg-white shadow-sm text-brand-700";
+            } else if (view === 'admin') {
+                views.admin.classList.remove('hidden');
+                btns.admin.className = "px-3.5 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 bg-white shadow-sm text-brand-700";
+                renderAdminTables();
+                renderReservationsTable();
+            }
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function switchAdminSubTab(tab) {
+            const prodTabBtn = document.getElementById('admin-tab-products');
+            const orderTabBtn = document.getElementById('admin-tab-orders');
+            const prodContent = document.getElementById('subtab-products-content');
+            const orderContent = document.getElementById('subtab-orders-content');
+
+            if (tab === 'products') {
+                prodContent.classList.remove('hidden');
+                orderContent.classList.add('hidden');
+                prodTabBtn.className = "px-6 py-3 font-semibold text-sm text-brand-600 border-b-2 border-brand-600";
+                orderTabBtn.className = "px-6 py-3 font-semibold text-sm text-gray-500 hover:text-gray-700";
+            } else {
+                prodContent.classList.add('hidden');
+                orderContent.classList.remove('hidden');
+                orderTabBtn.className = "px-6 py-3 font-semibold text-sm text-brand-600 border-b-2 border-brand-600";
+                prodTabBtn.className = "px-6 py-3 font-semibold text-sm text-gray-500 hover:text-gray-700";
+            }
+        }
+
+        // Render User Selection Forms
+        function renderUserCategories() {
+            const btnGroup = document.getElementById('category-button-group');
+            btnGroup.innerHTML = '';
+
+            if (db.categories.length === 0) {
+                btnGroup.innerHTML = '<p class="col-span-full text-xs text-gray-400">등록된 카테고리가 없습니다.</p>';
+                return;
+            }
+
+            db.categories.forEach((cat, idx) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                const isSelected = selectedCategoryName === cat.name || (!selectedCategoryName && idx === 0);
+                
+                if (isSelected && !selectedCategoryName) {
+                    selectedCategoryName = cat.name;
+                }
+
+                btn.className = `py-3 px-4 rounded-xl text-xs font-bold transition-all border text-center flex items-center justify-center space-x-2 ${
+                    isSelected 
+                        ? 'bg-brand-600 text-white border-brand-600 shadow-md shadow-brand-100' 
+                        : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                }`;
+                btn.innerHTML = `<i class="fa-solid fa-check text-[10px] ${isSelected ? 'inline' : 'hidden'}"></i><span>${cat.name}</span>`;
+                btn.onclick = () => selectCategoryUser(cat.name);
+                btnGroup.appendChild(btn);
+            });
+
+            populateProductsDropdown();
+        }
+
+        function selectCategoryUser(catName) {
+            selectedCategoryName = catName;
+            renderUserCategories();
+        }
+
+        function populateProductsDropdown() {
+            const productSelect = document.getElementById('user-product-select');
+            productSelect.innerHTML = '<option value="">-- 상품을 선택하세요 --</option>';
+
+            const categoryObj = db.categories.find(c => c.name === selectedCategoryName);
+            if (!categoryObj) return;
+
+            const filteredProducts = db.products.filter(p => p.categoryId === categoryObj.id);
+
+            filteredProducts.forEach(prod => {
+                const opt = document.createElement('option');
+                opt.value = prod.id;
+                opt.textContent = prod.name;
+                productSelect.appendChild(opt);
+            });
+
+            document.getElementById('price-options-container').innerHTML = '<p class="text-sm text-gray-400 italic bg-gray-50 p-4 rounded-xl text-center">상품을 선택하시면 용량 및 가격 옵션이 표시됩니다.</p>';
+            selectedProductPriceOption = null;
+            calculateTotal();
+        }
+
+        function handleProductChange() {
+            const prodId = document.getElementById('user-product-select').value;
+            const container = document.getElementById('price-options-container');
+            container.innerHTML = '';
+
+            if (!prodId) {
+                container.innerHTML = '<p class="text-sm text-gray-400 italic bg-gray-50 p-4 rounded-xl text-center">상품을 선택하시면 용량 및 가격 옵션이 표시됩니다.</p>';
+                selectedProductPriceOption = null;
+                calculateTotal();
+                return;
+            }
+
+            const matchingPrices = db.prices.filter(p => p.productId === prodId);
+
+            if (matchingPrices.length === 0) {
+                container.innerHTML = '<p class="text-xs text-rose-500 bg-rose-50 p-3 rounded-xl">해당 상품에 설정된 가격 정보가 없습니다.</p>';
+                selectedProductPriceOption = null;
+                calculateTotal();
+                return;
+            }
+
+            matchingPrices.forEach((pri, idx) => {
+                const radioDiv = document.createElement('label');
+                radioDiv.className = "flex items-center justify-between p-3.5 border rounded-xl cursor-pointer hover:bg-rose-50/50 transition-all";
+                
+                const isFirst = idx === 0;
+                if (isFirst) selectedProductPriceOption = pri;
+
+                radioDiv.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <input type="radio" name="price-option" value="${pri.id}" ${isFirst ? 'checked' : ''} onchange="selectPriceOption('${pri.id}')" class="text-brand-600 focus:ring-brand-500">
+                        <span class="text-sm font-semibold text-gray-800">${pri.option}</span>
+                    </div>
+                    <span class="text-sm font-bold text-brand-700">${pri.price.toLocaleString()} 원</span>
+                `;
+                container.appendChild(radioDiv);
+            });
+
+            calculateTotal();
+        }
+
+        function selectPriceOption(priceId) {
+            selectedProductPriceOption = db.prices.find(p => p.id === priceId);
+            calculateTotal();
+        }
+
+        function adjustQuantity(delta) {
+            const qtyInput = document.getElementById('user-quantity');
+            let current = parseInt(qtyInput.value) || 1;
+            current += delta;
+            if (current < 1) current = 1;
+            if (current > 99) current = 99;
+            qtyInput.value = current;
+            calculateTotal();
+        }
+
+        function calculateTotal() {
+            const prodSelect = document.getElementById('user-product-select');
+            const qty = parseInt(document.getElementById('user-quantity').value) || 1;
+
+            const selectedProd = db.products.find(p => p.id === prodSelect.value);
+
+            document.getElementById('summary-category').textContent = selectedCategoryName || '-';
+            document.getElementById('summary-product').textContent = selectedProd ? selectedProd.name : '-';
+            document.getElementById('summary-option').textContent = selectedProductPriceOption ? selectedProductPriceOption.option : '-';
+            
+            const unitPrice = selectedProductPriceOption ? selectedProductPriceOption.price : 0;
+            document.getElementById('summary-unit-price').textContent = `${unitPrice.toLocaleString()} 원`;
+            document.getElementById('summary-quantity').textContent = `${qty} 개`;
+
+            const total = unitPrice * qty;
+            document.getElementById('summary-total-price').textContent = `${total.toLocaleString()} 원`;
+        }
+
+        // Submit Reservation -> Show Printable Receipt Page
+        function submitReservation(e) {
+            e.preventDefault();
+
+            const prodSelect = document.getElementById('user-product-select');
+            if (!selectedCategoryName || !prodSelect.value || !selectedProductPriceOption) {
+                showToast('카테고리, 상품 및 가격 규격 옵션을 모두 선택해주세요.', 'error');
+                return;
+            }
+
+            const name = document.getElementById('cust-name').value.trim();
+            const phone = document.getElementById('cust-phone').value.trim();
+            const type = document.getElementById('cust-type').value;
+            const targetDate = document.getElementById('cust-date').value;
+            const address = document.getElementById('cust-address').value.trim();
+            const memo = document.getElementById('cust-memo').value.trim();
+            const quantity = parseInt(document.getElementById('user-quantity').value) || 1;
+
+            const selectedProd = db.products.find(p => p.id === prodSelect.value);
+            const unitPrice = selectedProductPriceOption.price;
+            const totalPrice = unitPrice * quantity;
+
+            const newReservation = {
+                id: 'RES-' + new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 12),
+                date: new Date().toLocaleString('ko-KR', { hour12: false }),
+                name,
+                phone,
+                type,
+                targetDate,
+                address: address || '방문 수령 (배송지 없음)',
+                category: selectedCategoryName,
+                product: selectedProd.name,
+                option: selectedProductPriceOption.option,
+                unitPrice,
+                quantity,
+                totalPrice,
+                memo: memo || '없음'
+            };
+
+            db.reservations.unshift(newReservation);
+            saveStateToLocalStorage();
+
+            // Render Printable Receipt View
+            renderReceiptView(newReservation);
+            
+            // Clear form
+            document.getElementById('reservation-form').reset();
+            showToast('예약이 성공적으로 접수되었습니다.');
+
+            // Switch view to Printable Receipt
+            switchView('print');
+        }
+
+        // Render Confirmation & Print Receipt
+        function renderReceiptView(res) {
+            document.getElementById('receipt-id').textContent = res.id;
+            document.getElementById('receipt-date').textContent = res.date;
+            document.getElementById('receipt-name').textContent = res.name;
+            document.getElementById('receipt-phone').textContent = res.phone;
+            document.getElementById('receipt-type').textContent = res.type;
+            document.getElementById('receipt-target-date').textContent = res.targetDate;
+            document.getElementById('receipt-address').textContent = res.address;
+            document.getElementById('receipt-memo').textContent = res.memo;
+
+            document.getElementById('receipt-item-cat').textContent = res.category;
+            document.getElementById('receipt-item-prod').textContent = res.product;
+            document.getElementById('receipt-item-opt').textContent = res.option;
+            document.getElementById('receipt-item-unit').textContent = `${res.unitPrice.toLocaleString()}원`;
+            document.getElementById('receipt-item-qty').textContent = `${res.quantity}개`;
+            document.getElementById('receipt-item-subtotal').textContent = `${res.totalPrice.toLocaleString()}원`;
+            document.getElementById('receipt-grand-total').textContent = `${res.totalPrice.toLocaleString()} 원`;
+        }
+
+        // Reservation Lookup Function
+        function performReservationLookup() {
+            const name = document.getElementById('lookup-name').value.trim();
+            const phone = document.getElementById('lookup-phone').value.trim();
+            const container = document.getElementById('lookup-results-container');
+
+            if (!name || !phone) {
+                showToast('성함과 연락처를 모두 입력해주세요.', 'error');
+                return;
+            }
+
+            const matches = db.reservations.filter(r => r.name === name && r.phone.includes(phone));
+
+            container.innerHTML = '';
+
+            if (matches.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-white rounded-2xl p-6 text-center text-gray-500 border border-gray-100">
+                        <i class="fa-solid fa-folder-open text-3xl text-gray-300 mb-2"></i>
+                        <p class="text-sm font-medium">일치하는 예약 내역을 찾을 수 없습니다.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            matches.forEach(res => {
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4";
+                card.innerHTML = `
+                    <div class="flex justify-between items-start border-b border-gray-100 pb-3">
+                        <div>
+                            <span class="font-mono text-xs text-gray-400 font-bold">${res.id}</span>
+                            <h3 class="font-bold text-gray-900 text-base">${res.product} [${res.option}]</h3>
+                        </div>
+                        <span class="bg-rose-50 text-brand-700 text-xs font-bold px-2.5 py-1 rounded-full">${res.type}</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-y-2 text-xs text-gray-600">
+                        <div><span class="text-gray-400">수령 희망일:</span> <strong class="text-gray-800">${res.targetDate}</strong></div>
+                        <div><span class="text-gray-400">수량:</span> <strong class="text-gray-800">${res.quantity}개</strong></div>
+                        <div><span class="text-gray-400">결제 예정액:</span> <strong class="text-brand-700 font-bold">${res.totalPrice.toLocaleString()}원</strong></div>
+                        <div><span class="text-gray-400">신청일시:</span> ${res.date}</div>
+                        <div class="col-span-2"><span class="text-gray-400">배송지:</span> ${res.address}</div>
+                    </div>
+
+                    <button onclick='viewAndPrintReceipt(${JSON.stringify(res)})' class="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold py-2.5 rounded-xl transition-all flex items-center justify-center space-x-1">
+                        <i class="fa-solid fa-print mr-1"></i>확정서 보기 및 인쇄
+                    </button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function viewAndPrintReceipt(res) {
+            renderReceiptView(res);
+            switchView('print');
+        }
+
+        function renderAdminTables() {
+            // Table 1: Categories
+            const t1Tbody = document.getElementById('t1-category-tbody');
+            t1Tbody.innerHTML = '';
+            db.categories.forEach(cat => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50";
+                tr.innerHTML = `
+                    <td class="p-2.5 font-mono text-gray-400">${cat.id}</td>
+                    <td class="p-2.5 font-semibold text-gray-800">${cat.name}</td>
+                    <td class="p-2.5 text-right">
+                        <button onclick="deleteCategory('${cat.id}')" class="text-rose-600 hover:text-rose-800 font-medium">삭제</button>
+                    </td>
+                `;
+                t1Tbody.appendChild(tr);
+            });
+
+            // Update T2 Category Select Dropdown
+            const t2Select = document.getElementById('t2-category-select');
+            t2Select.innerHTML = '<option value="">-- 카테고리 선택 --</option>';
+            db.categories.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat.id;
+                opt.textContent = cat.name;
+                t2Select.appendChild(opt);
+            });
+
+            // Table 2: Products
+            const t2Tbody = document.getElementById('t2-product-tbody');
+            t2Tbody.innerHTML = '';
+            db.products.forEach(prod => {
+                const cat = db.categories.find(c => c.id === prod.categoryId);
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50";
+                tr.innerHTML = `
+                    <td class="p-2.5 text-gray-500">${cat ? cat.name : '미지정'}</td>
+                    <td class="p-2.5 font-semibold text-gray-800">${prod.name}</td>
+                    <td class="p-2.5 text-right">
+                        <button onclick="deleteProduct('${prod.id}')" class="text-rose-600 hover:text-rose-800 font-medium">삭제</button>
+                    </td>
+                `;
+                t2Tbody.appendChild(tr);
+            });
+
+            // Update T3 Product Select Dropdown
+            const t3Select = document.getElementById('t3-product-select');
+            t3Select.innerHTML = '<option value="">-- 상품 선택 --</option>';
+            db.products.forEach(prod => {
+                const opt = document.createElement('option');
+                opt.value = prod.id;
+                opt.textContent = prod.name;
+                t3Select.appendChild(opt);
+            });
+
+            // Table 3: Prices
+            const t3Tbody = document.getElementById('t3-price-tbody');
+            t3Tbody.innerHTML = '';
+            db.prices.forEach(pri => {
+                const prod = db.products.find(p => p.id === pri.productId);
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50";
+                tr.innerHTML = `
+                    <td class="p-2.5 text-gray-500">${prod ? prod.name : '미지정'}</td>
+                    <td class="p-2.5 font-semibold text-gray-800">${pri.option}</td>
+                    <td class="p-2.5 font-bold text-emerald-700">${pri.price.toLocaleString()}원</td>
+                    <td class="p-2.5 text-right">
+                        <button onclick="deletePrice('${pri.id}')" class="text-rose-600 hover:text-rose-800 font-medium">삭제</button>
+                    </td>
+                `;
+                t3Tbody.appendChild(tr);
+            });
+        }
+
+        // Table 1 Operations
+        function addCategory() {
+            const input = document.getElementById('t1-category-input');
+            const name = input.value.trim();
+            if (!name) return showToast('카테고리명을 입력하세요.', 'error');
+
+            const newId = 'CAT' + (Date.now() % 10000);
+            db.categories.push({ id: newId, name });
+            saveStateToLocalStorage();
+            input.value = '';
+            renderAdminTables();
+            showToast('카테고리가 추가되었습니다.');
+        }
+
+        function deleteCategory(id) {
+            db.categories = db.categories.filter(c => c.id !== id);
+            const associatedProds = db.products.filter(p => p.categoryId === id).map(p => p.id);
+            db.products = db.products.filter(p => p.categoryId !== id);
+            db.prices = db.prices.filter(p => !associatedProds.includes(p.productId));
+
+            saveStateToLocalStorage();
+            renderAdminTables();
+            showToast('카테고리 및 연관 상품이 삭제되었습니다.');
+        }
+
+        // Table 2 Operations
+        function addProduct() {
+            const catId = document.getElementById('t2-category-select').value;
+            const input = document.getElementById('t2-product-input');
+            const name = input.value.trim();
+
+            if (!catId) return showToast('카테고리를 선택하세요.', 'error');
+            if (!name) return showToast('상품명을 입력하세요.', 'error');
+
+            const newId = 'PROD' + (Date.now() % 10000);
+            db.products.push({ id: newId, categoryId: catId, name });
+            saveStateToLocalStorage();
+            input.value = '';
+            renderAdminTables();
+            showToast('상품명이 추가되었습니다.');
+        }
+
+        function deleteProduct(id) {
+            db.products = db.products.filter(p => p.id !== id);
+            db.prices = db.prices.filter(p => p.productId !== id);
+            saveStateToLocalStorage();
+            renderAdminTables();
+            showToast('상품이 삭제되었습니다.');
+        }
+
+        // Table 3 Operations
+        function addPriceOption() {
+            const prodId = document.getElementById('t3-product-select').value;
+            const optionInput = document.getElementById('t3-option-input');
+            const priceInput = document.getElementById('t3-price-input');
+
+            const option = optionInput.value.trim();
+            const price = parseInt(priceInput.value);
+
+            if (!prodId) return showToast('상품을 선택하세요.', 'error');
+            if (!option) return showToast('규격/용량을 입력하세요.', 'error');
+            if (isNaN(price) || price < 0) return showToast('올바른 가격을 입력하세요.', 'error');
+
+            const newId = 'PRI' + (Date.now() % 10000);
+            db.prices.push({ id: newId, productId: prodId, option, price });
+            saveStateToLocalStorage();
+
+            optionInput.value = '';
+            priceInput.value = '';
+            renderAdminTables();
+            showToast('가격 옵션이 등록되었습니다.');
+        }
+
+        function deletePrice(id) {
+            db.prices = db.prices.filter(p => p.id !== id);
+            saveStateToLocalStorage();
+            renderAdminTables();
+            showToast('가격 옵션이 삭제되었습니다.');
+        }
+
+        // Render Reservation List Table (Admin View)
+        function renderReservationsTable(filteredData = null) {
+            const tbody = document.getElementById('reservation-tbody');
+            const badge = document.getElementById('reservation-count-badge');
+            tbody.innerHTML = '';
+
+            const list = filteredData || db.reservations;
+            badge.textContent = db.reservations.length;
+
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-gray-400">예약 신청 내역이 없습니다.</td></tr>`;
+                return;
+            }
+
+            list.forEach(res => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 border-b border-gray-100";
+                tr.innerHTML = `
+                    <td class="p-3 font-mono font-medium text-gray-600">${res.id}</td>
+                    <td class="p-3 text-gray-500">${res.date}</td>
+                    <td class="p-3 font-bold text-gray-800">${res.name}</td>
+                    <td class="p-3 text-gray-600">${res.phone}</td>
+                    <td class="p-3">
+                        <span class="inline-block bg-gray-100 text-gray-700 font-semibold px-2 py-0.5 rounded text-[11px] mb-1">${res.type}</span>
+                        <div class="text-gray-500">${res.targetDate}</div>
+                    </td>
+                    <td class="p-3">
+                        <div class="font-semibold text-gray-800">${res.product} (${res.option})</div>
+                        <div class="text-xs text-gray-400">수량: ${res.quantity}개 | ${res.address}</div>
+                    </td>
+                    <td class="p-3 font-extrabold text-brand-700">${res.totalPrice.toLocaleString()}원</td>
+                    <td class="p-3 text-center space-x-2">
+                        <button onclick='viewAndPrintReceipt(${JSON.stringify(res)})' class="text-blue-600 hover:text-blue-800 text-xs font-semibold">
+                            인쇄
+                        </button>
+                        <button onclick="deleteReservation('${res.id}')" class="text-rose-600 hover:text-rose-800 text-xs font-semibold">
+                            삭제
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filterOrders() {
+            const query = document.getElementById('order-search-input').value.toLowerCase().trim();
+            if (!query) {
+                renderReservationsTable();
+                return;
+            }
+            const filtered = db.reservations.filter(r => 
+                r.name.toLowerCase().includes(query) || 
+                r.phone.includes(query) ||
+                r.id.toLowerCase().includes(query)
+            );
+            renderReservationsTable(filtered);
+        }
+
+        function deleteReservation(id) {
+            db.reservations = db.reservations.filter(r => r.id !== id);
+            saveStateToLocalStorage();
+            renderReservationsTable();
+            showToast('예약 항목이 삭제되었습니다.');
+        }
+
+        function clearAllOrders() {
+            if (db.reservations.length === 0) return;
+            if (confirm('정말로 전체 예약 내역을 삭제하시겠습니까? 복구할 수 없습니다.')) {
+                db.reservations = [];
+                saveStateToLocalStorage();
+                renderReservationsTable();
+                showToast('모든 예약 내역이 삭제되었습니다.');
+            }
+        }
+
+        function exportProductsToExcel() {
+            const categoriesSheetData = db.categories.map(c => ({
+                "카테고리ID": c.id,
+                "카테고리명": c.name
+            }));
+
+            const productsSheetData = db.products.map(p => {
+                const cat = db.categories.find(c => c.id === p.categoryId);
+                return {
+                    "상품ID": p.id,
+                    "카테고리ID": p.categoryId,
+                    "카테고리명": cat ? cat.name : '',
+                    "상품명": p.name
+                };
+            });
+
+            const pricesSheetData = db.prices.map(pr => {
+                const prod = db.products.find(p => p.id === pr.productId);
+                return {
+                    "가격옵션ID": pr.id,
+                    "상품ID": pr.productId,
+                    "상품명": prod ? prod.name : '',
+                    "용량규격": pr.option,
+                    "가격(원)": pr.price
+                };
+            });
+
+            const wb = XLSX.utils.book_new();
+            
+            const wsCategories = XLSX.utils.json_to_sheet(categoriesSheetData);
+            const wsProducts = XLSX.utils.json_to_sheet(productsSheetData);
+            const wsPrices = XLSX.utils.json_to_sheet(pricesSheetData);
+
+            XLSX.utils.book_append_sheet(wb, wsCategories, "카테고리_테이블1");
+            XLSX.utils.book_append_sheet(wb, wsProducts, "상품_테이블2");
+            XLSX.utils.book_append_sheet(wb, wsPrices, "가격_테이블3");
+
+            XLSX.writeFile(wb, `김장양념_상품가격_설정_${new Date().toISOString().slice(0,10)}.xlsx`);
+            showToast('상품/가격 데이터 엑셀 파일이 내보내기 되었습니다.');
+        }
+
+        function exportOrdersToExcel() {
+            if (db.reservations.length === 0) {
+                showToast('내보낼 예약 데이터가 없습니다.', 'error');
+                return;
+            }
+
+            const ordersData = db.reservations.map(r => ({
+                "예약번호": r.id,
+                "신청일시": r.date,
+                "예약자명": r.name,
+                "연락처": r.phone,
+                "수령방식": r.type,
+                "희망수령일": r.targetDate,
+                "배송지주소": r.address,
+                "카테고리": r.category,
+                "상품명": r.product,
+                "용량규격": r.option,
+                "단가(원)": r.unitPrice,
+                "수량": r.quantity,
+                "총금액(원)": r.totalPrice,
+                "메모": r.memo
+            }));
+
+            const wb = XLSX.utils.book_new();
+            const wsOrders = XLSX.utils.json_to_sheet(ordersData);
+            XLSX.utils.book_append_sheet(wb, wsOrders, "예약신청내역");
+
+            XLSX.writeFile(wb, `김장예약_신청내역_${new Date().toISOString().slice(0,10)}.xlsx`);
+            showToast('예약 내역 엑셀 파일이 다운로드되었습니다.');
+        }
+
+        function importProductsFromExcel(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+
+                    const sheet1 = workbook.Sheets["카테고리_테이블1"] || workbook.Sheets[workbook.SheetNames[0]];
+                    const sheet2 = workbook.Sheets["상품_테이블2"] || workbook.Sheets[workbook.SheetNames[1]];
+                    const sheet3 = workbook.Sheets["가격_테이블3"] || workbook.Sheets[workbook.SheetNames[2]];
+
+                    if (!sheet1 || !sheet2 || !sheet3) {
+                        showToast('올바른 형식의 엑셀 시트(3개 테이블)가 존재하지 않습니다.', 'error');
+                        return;
+                    }
+
+                    const jsonCategories = XLSX.utils.sheet_to_json(sheet1);
+                    const jsonProducts = XLSX.utils.sheet_to_json(sheet2);
+                    const jsonPrices = XLSX.utils.sheet_to_json(sheet3);
+
+                    const newCategories = jsonCategories.map((row, idx) => ({
+                        id: String(row["카테고리ID"] || ('CAT' + (idx + 1))),
+                        name: String(row["카테고리명"] || '미정')
+                    }));
+
+                    const newProducts = jsonProducts.map((row, idx) => ({
+                        id: String(row["상품ID"] || ('PROD' + (idx + 1))),
+                        categoryId: String(row["카테고리ID"] || (newCategories[0] ? newCategories[0].id : '')),
+                        name: String(row["상품명"] || '미정')
+                    }));
+
+                    const newPrices = jsonPrices.map((row, idx) => ({
+                        id: String(row["가격옵션ID"] || ('PRI' + (idx + 1))),
+                        productId: String(row["상품ID"] || (newProducts[0] ? newProducts[0].id : '')),
+                        option: String(row["용량규격"] || '기본'),
+                        price: Number(row["가격(원)"] || 0)
+                    }));
+
+                    db.categories = newCategories;
+                    db.products = newProducts;
+                    db.prices = newPrices;
+
+                    saveStateToLocalStorage();
+                    renderAdminTables();
+                    renderUserCategories();
+
+                    showToast('엑셀 데이터가 성공적으로 불러와졌습니다.');
+                } catch (err) {
+                    console.error(err);
+                    showToast('엑셀 파일 분석 중 오류가 발생했습니다.', 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+            e.target.value = '';
+        }
+
+        // Toast Helper
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            const toastIcon = document.getElementById('toast-icon');
+
+            toastMessage.textContent = message;
+            if (type === 'error') {
+                toastIcon.className = "fa-solid fa-circle-exclamation text-rose-400 text-lg";
+            } else {
+                toastIcon.className = "fa-solid fa-circle-check text-emerald-400 text-lg";
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
